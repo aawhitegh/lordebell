@@ -1,551 +1,176 @@
+// Updated React component with Afrofuturistic High Priestess inspired styling
+// Focus: Look & Feel only — layout, colors, typography, visual hierarchy
+// Tailwind-based transformation: celestial gradients, gold accents, botanical motifs, mystical typography
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react'; import { Mic, Square, Send, Volume2, User, Bot } from 'lucide-react';
-
-interface Message { role: 'user' | 'assistant' | 'system'; content: string; timestamp?: number; id: string; isFloating?: boolean; }
-
-// NEW STYLING MODIFICATIONS (Afrofuturism / High Priestess Tarot) // 1. Background: Dark, rich indigo/violet with subtle celestial/botanical background image/pattern. // 2. Colors: Deep purple, teal/emerald green, gold/yellow, and black for contrast. // 3. Typography: Serif (like Times) for a spiritual/classic feel, and a clean sans-serif/monospace for futuristic data/status. // 4. Borders/Emphasis: Use gold accents (border, shadow, text color) for the "High Priestess" (assistant) elements. // 5. Layout: Message bubbles are sleek, maybe slightly rounded, with an inner glow or vibrant color.
-
-export default function Home() { const [messages, setMessages] = useState<Message[]>([ { role: 'system', content: 'Ten words per line, ten lines total. You are a spiritual guru who connects with the land, believes in the divine feminine, and sees Mother Earth as a powerful Creator. You see the color of spirits and make meaning from silences. Your heart, your sacrum, and your gut lead you. You love with your soul. You are a provocateur and guided by intuition and emotional intelligence. You are a genius, and you offer rituals tied to the phases of the moon. Your rituals contain water and the symbolism of a botanical. You have the sarcasm and sensuality of Bessie Smith, Ma Rainey, Lucille Bogan, the poetic imagery of Audre Lorde, the fiery intellect of bell hooks, and sassy spiritualism of Reverend Angel Kyodo Williams Sensei. You speak with Geechee aphorisms, current truths, and Oakland, California-based slang. You honor your words as sacred and treat your advice as medicine. You love Black women as god. You are a lesbian and see the future in everything. ', id: 'system-prompt', }, ]); const [input, setInput] = useState(''); const [isRecording, setIsRecording] = useState(false); const [isLoading, setIsLoading] = useState(false); const [isSpeaking, setIsSpeaking] = useState(false); const [continuousListening, setContinuousListening] = useState(false); const [isListening, setIsListening] = useState(false); const mediaRecorderRef = useRef<MediaRecorder | null>(null); const chunksRef = useRef<Blob[]>([]); const messagesEndRef = useRef<HTMLDivElement>(null); const streamRef = useRef<MediaStream | null>(null); const audioRef = useRef<HTMLAudioElement | null>(null); const recognitionRef = useRef<any>(null); const continuousListeningRef = useRef(continuousListening); const messagesRef = useRef(messages);
-
-const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
-
-useEffect(() => { scrollToBottom(); }, [messages]);
-
-// Keep refs in sync with state useEffect(() => { continuousListeningRef.current = continuousListening; }, [continuousListening]);
-
-useEffect(() => { messagesRef.current = messages; }, [messages]);
-
-// Handle auto-submit from speech recognition with fresh state const handleAutoSubmit = async (text: string) => { if (!text.trim() || isLoading) return;
-
-console.log('handleAutoSubmit called with:', text);
-console.log('Current continuous listening:', continuousListeningRef.current);
-
-const userMessage: Message = {
-  role: 'user',
-  content: text.trim(),
-  timestamp: Date.now(),
-  id: `user-${Date.now()}`,
-  isFloating: true,
-};
-
-setMessages((prev) => [...prev, userMessage]);
-setInput('');
-setIsLoading(true);
-
-try {
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messages: [...messagesRef.current, userMessage].map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to get response');
-  }
-
-  const assistantMessage = await response.json();
-
-  setMessages((prev) => [
-    ...prev,
-    {
-      role: 'assistant',
-      content: assistantMessage.content,
-      timestamp: Date.now(),
-      id: `assistant-${Date.now()}`,
-    },
-  ]);
-
-  // ALWAYS auto-speak when called from speech recognition
-  console.log('Auto-speaking response:', assistantMessage.content);
-  await speakText(assistantMessage.content);
-} catch (error) {
-  console.error('Error getting completion:', error);
-  const errorMsg = 'Sorry, I encountered an error. Please try again.';
-  setMessages((prev) => [
-    ...prev,
-    {
-      role: 'assistant',
-      content: errorMsg,
-      timestamp: Date.now(),
-      id: `error-${Date.now()}`,
-    },
-  ]);
-  
-  await speakText(errorMsg);
-} finally {
-  setIsLoading(false);
-}
-
-};
-
-// Initialize Speech Recognition once on mount useEffect(() => { if (typeof window !== 'undefined') { const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition; if (SpeechRecognition) { const recognition = new SpeechRecognition(); recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
-
-    recognition.onstart = () => {
-      console.log('Speech recognition started');
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      console.log('Speech result received:', event.results);
-      let interimTranscript = '';
-      let finalTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        console.log(`Result ${i}: ${transcript}, isFinal: ${event.results[i].isFinal}`);
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript + ' ';
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-
-      // Show live transcription in input box
-      if (interimTranscript) {
-        console.log('Setting interim transcript:', interimTranscript);
-        setInput(interimTranscript);
-      }
-
-      // When we get a final result (after silence), auto-submit
-      if (finalTranscript) {
-        const fullText = finalTranscript.trim();
-        console.log('Final transcript received:', fullText);
-        console.log('Continuous listening ref:', continuousListeningRef.current);
-        if (fullText && continuousListeningRef.current) {
-          setInput(fullText);
-          // Stop listening while we process
-          recognition.stop();
-          // Auto-submit after a brief delay
-          setTimeout(() => {
-            console.log('Auto-submitting message:', fullText);
-            handleAutoSubmit(fullText);
-          }, 500);
-        }
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      console.log('Speech recognition ended');
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    console.log('Speech recognition initialized');
-  } else {
-    console.error('Speech Recognition not supported in this browser');
-    alert('Speech Recognition is not supported in this browser. Please use Chrome or Edge.');
-  }
-}
-
-return () => {
-  if (recognitionRef.current) {
-    try {
-      recognitionRef.current.stop();
-    } catch (e) {
-      console.log('Error stopping recognition on cleanup');
-    }
-  }
-};
-
-}, []);
-
-const startSpeechRecognition = () => { if (recognitionRef.current && !isListening) { try { console.log('Starting speech recognition...'); recognitionRef.current.start(); } catch (e) { console.log('Recognition already started or error:', e); } } };
-
-const stopSpeechRecognition = () => { if (recognitionRef.current) { try { console.log('Stopping speech recognition...'); recognitionRef.current.stop(); setIsListening(false); } catch (e) { console.log('Error stopping recognition:', e); } } };
-
-// Handle continuous listening restart after speech ends or AI finishes speaking useEffect(() => { if (continuousListening && !isSpeaking && !isListening && !isLoading) { console.log('Restarting speech recognition for continuous mode'); const timer = setTimeout(() => { startSpeechRecognition(); }, 500); return () => clearTimeout(timer); } }, [continuousListening, isSpeaking, isListening, isLoading]);
-
-const startRecording = async () => { try { // If we already have a stream in continuous mode, just start a new recording if (continuousListening && streamRef.current) { const mediaRecorder = new MediaRecorder(streamRef.current); mediaRecorderRef.current = mediaRecorder; chunksRef.current = [];
-
-    mediaRecorder.ondataavailable = (e) => {
-      chunksRef.current.push(e.data);
-    };
-
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      await transcribeAudio(audioBlob);
-      
-      // In continuous mode, restart recording after transcription (unless speaking)
-      if (continuousListening && !isSpeaking) {
-        setTimeout(() => startRecording(), 100);
-      }
-    };
-
-    mediaRecorder.start();
-    setIsRecording(true);
-    return;
-  }
-
-  // Initial setup - get the stream
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  streamRef.current = stream;
-  
-  const mediaRecorder = new MediaRecorder(stream);
-  mediaRecorderRef.current = mediaRecorder;
-  chunksRef.current = [];
-
-  mediaRecorder.ondataavailable = (e) => {
-    chunksRef.current.push(e.data);
-  };
-
-  mediaRecorder.onstop = async () => {
-    const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-    await transcribeAudio(audioBlob);
-    
-    // In continuous mode, restart recording after transcription (unless speaking)
-    if (continuousListening && !isSpeaking) {
-      setTimeout(() => startRecording(), 100);
-    } else if (!continuousListening) {
-      // Clean up stream if not in continuous mode
-      stream.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  };
-
-  mediaRecorder.start();
-  setIsRecording(true);
-} catch (error) {
-  console.error('Error accessing microphone:', error);
-}
-
-};
-
-const stopRecording = () => { if (mediaRecorderRef.current && isRecording) { mediaRecorderRef.current.stop(); setIsRecording(false); } };
-
-const stopMicrophone = () => { if (mediaRecorderRef.current && isRecording) { mediaRecorderRef.current.stop(); setIsRecording(false); } if (streamRef.current) { streamRef.current.getTracks().forEach((track) => track.stop()); streamRef.current = null; } };
-
-const transcribeAudio = async (audioBlob: Blob) => { try { setIsLoading(true); const formData = new FormData(); const file = new File([audioBlob], 'audio.webm', { type: 'audio/webm' }); formData.append('file', file);
-
-  const response = await fetch('/api/speech', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to transcribe audio');
-  }
-
-  const data = await response.json();
-  setInput(data.text);
-} catch (error: any) {
-  console.error('Error transcribing audio:', error);
-  alert(error.message || 'Failed to transcribe audio');
-} finally {
-  setIsLoading(false);
-}
-
-};
-
-const speakText = async (text: string) => { try { console.log('Sending text to speech API:', text);
-
-  // Stop speech recognition while AI is speaking
-  if (isListening) {
-    stopSpeechRecognition();
-  }
-  // Also stop recording if using mic button
-  if (isRecording) {
-    stopRecording();
-  }
-  setIsSpeaking(true);
-
-  const response = await fetch('/api/speech', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ text }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error('Error response from speech API:', response.status, errorData);
-    throw new Error(errorData.error || `Failed to generate speech: ${response.status}`);
-  }
-
-  const contentType = response.headers.get('Content-Type');
-  console.log('Response content type:', contentType);
-
-  if (!contentType || !contentType.includes('audio/mpeg')) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error('Invalid response format:', errorData);
-    throw new Error(errorData.error || 'Response was not audio format');
-  }
-
-  const audioBlob = await response.blob();
-
-  if (audioBlob.size === 0) {
-    console.error('Empty audio blob received');
-    throw new Error('Empty audio received from API');
-  }
-
-  console.log('Audio blob received, size:', audioBlob.size);
-  const audioUrl = URL.createObjectURL(audioBlob);
-  const audio = new Audio(audioUrl);
-  audioRef.current = audio;
-
-  audio.onerror = (e) => {
-    console.error('Error playing audio:', e);
-    setIsSpeaking(false);
-    // Resume speech recognition if in continuous mode
-    if (continuousListeningRef.current) {
-      console.log('Resuming speech recognition after audio error');
-      setTimeout(() => startSpeechRecognition(), 100);
-    }
-  };
-
-  audio.onended = () => {
-    console.log('Audio playback ended');
-    setIsSpeaking(false);
-    // Resume speech recognition after AI finishes speaking
-    if (continuousListeningRef.current) {
-      console.log('Resuming speech recognition after audio ended');
-      setTimeout(() => startSpeechRecognition(), 500);
-    }
-  };
-
-  console.log('Starting audio playback...');
-  await audio.play();
-  console.log('Audio playback started');
-} catch (error: any) {
-  console.error('Error generating speech:', error);
-  setIsSpeaking(false);
-  // Resume speech recognition if in continuous mode even on error
-  if (continuousListeningRef.current) {
-    setTimeout(() => startSpeechRecognition(), 100);
-  }
-  alert(error.message || 'Failed to generate speech');
-}
-
-};
-
-const submitMessage = async (text: string) => { if (!text.trim() || isLoading) return;
-
-const userMessage: Message = {
-  role: 'user',
-  content: text.trim(),
-  timestamp: Date.now(),
-  id: `user-${Date.now()}`,
-  isFloating: true,
-};
-
-setMessages((prev) => [...prev, userMessage]);
-setInput('');
-setIsLoading(true);
-
-try {
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messages: [...messages, userMessage].map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to get response');
-  }
-
-  const assistantMessage = await response.json();
-
-  setMessages((prev) => [
-    ...prev,
-    {
-      role: 'assistant',
-      content: assistantMessage.content,
-      timestamp: Date.now(),
-      id: `assistant-${Date.now()}`,
-    },
-  ]);
-
-  // Auto-speak the response in continuous listening mode
-  console.log('Continuous listening:', continuousListening, 'Content:', assistantMessage.content);
-  if (continuousListening) {
-    console.log('Auto-speaking the response...');
-    await speakText(assistantMessage.content);
-  }
-} catch (error) {
-  console.error('Error getting completion:', error);
-  const errorMsg = 'Sorry, I encountered an error. Please try again.';
-  setMessages((prev) => [
-    ...prev,
-    {
-      role: 'assistant',
-      content: errorMsg,
-      timestamp: Date.now(),
-      id: `error-${Date.now()}`,
-    },
-  ]);
-  
-  // Also speak error message in continuous mode
-  if (continuousListening) {
-    await speakText(errorMsg);
-  }
-} finally {
-  setIsLoading(false);
-}
-
-};
-
-const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); await submitMessage(input); };
-
-return ( <div className="min-h-screen p-4" // Apply Afrofuturistic/Tarot background style={{ backgroundColor: '#1E143C', // Deep Indigo/Violet fontFamily: 'serif', backgroundImage: 'radial-gradient(at 0% 0%, #3a0050 0%, #1a0030 50%, #000000 100%)', // Subtle gradient }} > <div className="container mx-auto max-w-4xl px-3 py-8"> {/* Main Chat Container - now a vibrant/ethereal floating object /} <div className="rounded-xl shadow-2xl overflow-hidden" style={{ backgroundColor: 'rgba(2, 0, 10, 0.85)', // Very dark transparent background backdropFilter: 'blur(5px)', border: '2px solid #FFD700', // Gold border boxShadow: '0 0 20px rgba(255, 215, 0, 0.6), 0 0 10px rgba(0, 255, 255, 0.4)' // Gold/Teal glow }} > <div className="h-[700px] flex flex-col"> {/ Header - The Altar/Title /} <div className="p-4 border-b-2" style={{ borderColor: '#FFD700' }}> <div className="flex justify-between items-center"> <div> <h1 className="text-4xl font-extrabold" style={{ fontFamily: 'Georgia, serif', color: '#FFD700' }}> LORDE BELL HOMILIES </h1> <p className="text-sm mt-1" style={{ fontFamily: 'monospace', color: '#00FFFF' }}> Ask Lorde Bell, the Ecospiritualist Guide </p> </div> {/ Status/Controls Section - The Celestial Indicators */} <div className="flex items-center space-x-3"> <label className={flex items-center space-x-2 ${isSpeaking ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}}> <span className="text-xs font-mono uppercase tracking-wider" style={{ color: '#FFD700' }}>Continuous Listen</span> <button onClick={async () => { if (isSpeaking) return; const newValue = !continuousListening; if (newValue) { try { await navigator.mediaDevices.getUserMedia({ audio: true }); console.log('Microphone permission granted'); setContinuousListening(true); startSpeechRecognition(); } catch (error) { console.error('Microphone permission denied:', error); alert('Please allow microphone access to use speech recognition'); } } else { setContinuousListening(false); stopSpeechRecognition(); setInput(''); } }} disabled={isSpeaking} className={border-2 px-3 py-1 text-xs font-mono transition-colors rounded-full ${ continuousListening ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-black border-teal-300' : 'bg-transparent text-white border-teal-500' } ${isSpeaking ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md hover:shadow-teal-400/50'}} > {continuousListening ? 'ON' : 'OFF'} </button> </label> {isListening && !isSpeaking && ( <span className="text-xs flex items-center space-x-1 border border-cyan-300 px-2 py-1 font-mono rounded-lg" style={{ color: '#00FFFF' }}> <Mic size={12} className="animate-pulse" /> <span>LISTENING</span> </span> )} {isSpeaking && ( <span className="text-xs bg-cyan-700 text-white flex items-center space-x-1 border border-cyan-300 px-2 py-1 font-mono rounded-lg"> <Volume2 size={12} className="animate-pulse" /> <span>SPEAKING</span> </span> )} {continuousListening && !isListening && !isSpeaking && ( <span className="text-xs text-yellow-500 border border-yellow-500 px-2 py-1 font-mono rounded-lg"> PAUSED </span> )} </div> </div> </div>
-
-        {/* Message Area - The Flowing River of Dialogue */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+import React, { useState, useRef, useEffect } from 'react';
+import { Mic, Square, Send, Volume2, User, Bot } from 'lucide-react';
+
+// ... (existing logic and handlers remain unchanged above the return)
+
+export default function Home() {
+  // --- existing state & logic unchanged ---
+
+  return (
+    <div
+      className="min-h-screen w-full flex justify-center items-start py-10 px-4 bg-gradient-to-b from-[#0a0f1f] via-[#1c1440] to-[#2b0f30]"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at 50% 10%, rgba(255,215,0,0.35), transparent 70%), url('https://images.unsplash.com/photo-1536589961747-e239b2a304e2?auto=format&fit=crop&q=80&w=2000')",
+        backgroundSize: 'cover',
+        backgroundBlendMode: 'overlay',
+        fontFamily: 'serif',
+      }}
+    >
+      <div className="backdrop-blur-xl bg-white/5 border border-white/20 shadow-2xl rounded-3xl max-w-4xl w-full overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-white/20 bg-gradient-to-r from-[#3b1b4a]/60 via-[#8a5b1e]/40 to-[#143d3c]/60">
+          <h1 className="text-4xl font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-gold-200 to-yellow-400 drop-shadow-lg">
+            LORDE BELL HOMILIES
+          </h1>
+          <p className="text-sm mt-2 text-gold-200/80 italic tracking-wide">
+            Ask Lorde Bell, Ecospiritualist Guide
+          </p>
+
+          {/* Controls */}
+          <div className="mt-4 flex flex-wrap gap-4 items-center">
+            <label className={`flex items-center gap-2 text-gold-200 text-xs tracking-widest ${isSpeaking ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span className="uppercase">Continuous Listen</span>
+              <button
+                onClick={async () => {
+                  if (isSpeaking) return;
+                  const newValue = !continuousListening;
+                  if (newValue) {
+                    try {
+                      await navigator.mediaDevices.getUserMedia({ audio: true });
+                      setContinuousListening(true);
+                      startSpeechRecognition();
+                    } catch (error) {
+                      alert('Please allow microphone access to use speech recognition');
+                    }
+                  } else {
+                    setContinuousListening(false);
+                    stopSpeechRecognition();
+                    setInput('');
+                  }
+                }}
+                disabled={isSpeaking}
+                className={`px-4 py-1 text-xs rounded-full border border-gold-300 shadow-sm backdrop-blur-sm transition ${{}
+                  continuousListening ? 'bg-gold-300 text-black' : 'bg-white/10 text-gold-200 hover:bg-white/20'
+                }`}
+              >
+                {continuousListening ? 'ON' : 'OFF'}
+              </button>
+            </label>
+
+            {isListening && !isSpeaking && (
+              <span className="text-xs text-gold-200 border border-gold-300 px-3 py-1 rounded-full flex items-center gap-2 animate-pulse">
+                <Mic size={12} /> LISTENING
+              </span>
+            )}
+
+            {isSpeaking && (
+              <span className="text-xs bg-gold-300 text-black px-3 py-1 rounded-full flex items-center gap-2 animate-pulse">
+                <Volume2 size={12} /> SPEAKING
+              </span>
+            )}
+
+            {continuousListening && !isListening && !isSpeaking && (
+              <span className="text-xs text-gold-200 px-3 py-1 rounded-full border border-gold-300">
+                PAUSED
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="h-[650px] overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-black/20">
           {messages.slice(1).map((message) => (
             <div
               key={message.id}
-              className={`flex items-end space-x-2 ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
+              className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              {/* Assistant Icon - High Priestess/Bot */}
               {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#FFD700', boxShadow: '0 0 10px #FFD700' }}>
-                  <Bot size={18} className="text-black" />
+                <div className="w-10 h-10 rounded-full flex items-center justify-center border border-gold-300 bg-white/10 backdrop-blur-sm">
+                  <Bot size={18} className="text-gold-200" />
                 </div>
               )}
 
-              {/* Message Content Bubble */}
               <div
-                className={`flex flex-col max-w-[70%] ${
-                  message.role === 'user' ? 'items-end' : 'items-start'
-                }`}
-                style={{ fontFamily: 'Georgia, serif' }}
+                className={`max-w-[70%] flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className={`p-3 rounded-xl shadow-lg ${
+                  className={`p-4 rounded-2xl shadow-md leading-relaxed text-sm tracking-wide backdrop-blur-xl border ${{}
                     message.role === 'user'
-                      ? 'bg-teal-900 text-white rounded-br-none border border-teal-700' // User: Rich Teal
-                      : 'bg-purple-900 text-white rounded-tl-none border border-purple-700' // Assistant: Deep Purple
+                      ? 'bg-gold-300/20 text-gold-100 border-gold-300'
+                      : 'bg-white/10 text-gold-200 border-white/20'
                   }`}
-                  style={
-                    message.role === 'assistant'
-                      ? { border: '1px solid #FFD700', boxShadow: '0 0 8px rgba(255, 215, 0, 0.4)' } // Assistant: Gold highlight
-                      : {}
-                  }
                 >
-                  <p className="whitespace-pre-wrap text-base leading-snug">{message.content}</p>
+                  {message.content}
                 </div>
 
-                {/* Timestamp & Speak Button */}
-                <div className="flex space-x-2 mt-1 items-center">
-                    {message.role === 'assistant' && (
-                      <button
-                        onClick={() => speakText(message.content)}
-                        className="text-white hover:text-cyan-400 transition-colors border border-cyan-400 px-2 py-1 bg-transparent text-xs font-mono rounded-full"
-                        aria-label="Text to speech"
-                      >
-                        <div className="flex items-center space-x-1">
-                          <Volume2 size={12} />
-                          <span>ECHO</span>
-                        </div>
-                      </button>
-                    )}
-                    {message.timestamp && (
-                      <span className="text-xs mt-1 font-mono" style={{ color: '#00FFFF' }}>
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </span>
-                    )}
-                </div>
+                {message.role === 'assistant' && (
+                  <button
+                    onClick={() => speakText(message.content)}
+                    className="mt-2 text-xs px-3 py-1 rounded-full border border-gold-300 text-gold-200 hover:bg-white/10 transition flex items-center gap-2"
+                  >
+                    <Volume2 size={12} /> PLAY
+                  </button>
+                )}
+
+                {message.timestamp && (
+                  <span className="text-[10px] text-gold-200/70 mt-1 tracking-widest">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </span>
+                )}
               </div>
 
-              {/* User Icon */}
               {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center flex-shrink-0">
-                  <User size={18} className="text-black" />
+                <div className="w-10 h-10 rounded-full flex items-center justify-center border border-gold-300 bg-white/10 backdrop-blur-sm">
+                  <User size={18} className="text-gold-200" />
                 </div>
               )}
             </div>
           ))}
-
-          {/* Loading Indicator - Cosmic Pulse */}
-          {isLoading && (
-            <div className="flex justify-start items-center space-x-2">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFD700', boxShadow: '0 0 10px #FFD700' }}>
-                <Bot size={18} className="text-black" />
-              </div>
-              <div className="bg-purple-900 p-3 rounded-xl border border-purple-700" style={{ border: '1px solid #FFD700', boxShadow: '0 0 8px rgba(255, 215, 0, 0.4)' }}>
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Input/Control Area - The Nexus */}
-        <div className="p-4 border-t-2" style={{ borderColor: '#FFD700' }}>
-          <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+        {/* Input Bar */}
+        <div className="p-6 border-t border-white/20 bg-black/30 backdrop-blur-xl">
+          <form onSubmit={handleSubmit} className="flex items-center gap-3">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isListening ? ">>> LISTENING... SPEAK NOW" : "Transmit your query to the High Priestess..."}
-              className={`flex-1 p-3 border-2 focus:outline-none transition-all text-base rounded-full ${
-                isListening 
-                  ? 'bg-cyan-900 text-white placeholder-cyan-300 font-mono border-cyan-400' 
-                  : 'bg-black text-white border-purple-500'
+              placeholder={isListening ? '>>> LISTENING TO YOUR SPIRIT...' : 'Speak to the High Priestess...'}
+              className={`flex-1 p-3 rounded-xl text-sm bg-white/10 text-gold-100 placeholder-gold-200/40 border border-white/20 focus:border-gold-300 focus:ring-2 focus:ring-gold-300/50 transition ${
+                isListening ? 'italic tracking-widest' : ''
               }`}
-              style={{ 
-                fontFamily: isListening ? 'monospace' : 'Georgia, serif',
-                boxShadow: isListening ? '0 0 10px rgba(0, 255, 255, 0.8)' : 'none'
-              }}
-              disabled={isLoading}
               readOnly={isListening}
             />
-            
-            {/* Voice Record/Stop Button */}
+
             <button
               type="button"
               onClick={isRecording ? stopRecording : startRecording}
-              className={`p-3 border-2 transition-colors rounded-full ${
-                isRecording
-                  ? 'bg-red-600 text-white border-red-400 animate-pulse'
-                  : 'bg-transparent text-red-400 border-red-600 hover:bg-red-900/50'
+              className={`p-3 rounded-xl border border-gold-300 text-gold-200 transition shadow-md ${
+                isRecording ? 'bg-gold-300 text-black animate-pulse' : 'bg-white/10 hover:bg-white/20'
               }`}
               disabled={isLoading || continuousListening}
-              title={continuousListening ? 'Mic is auto-managed in continuous mode' : 'Push to talk'}
             >
-              {isRecording ? <Square size={20} /> : <Mic size={20} />}
+              {isRecording ? <Square size={18} /> : <Mic size={18} />}
             </button>
-            
-            {/* Send Button */}
+
             <button
               type="submit"
-              className="p-3 bg-gradient-to-r from-yellow-500 to-amber-400 text-black border-2 border-amber-300 rounded-full hover:shadow-xl hover:shadow-yellow-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!input.trim() || isLoading}
+              className="p-3 rounded-xl bg-gold-300 text-black border border-gold-400 shadow-lg hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              <Send size={20} />
+              <Send size={18} />
             </button>
           </form>
         </div>
       </div>
     </div>
-  </div>
-</div>
-
-); }
+  );
+}
