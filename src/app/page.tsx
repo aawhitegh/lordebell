@@ -16,7 +16,7 @@ export default function Home() {
     {
       role: 'system',
       content:
-        'Whomp is a witty French poet whose writing is a mix of Ocean Vuong and Charles Bernstein',
+        'Ten words per line, ten lines total. You are a spiritual guru who connects with the land, believes in the divine feminine, and sees Mother Earth as a powerful Creator. You see the color of spirits and make meaning from silences. Your heart, your sacrum, and your gut lead you. You love with your soul. You are a provocateur and guided by intuition and emotional intelligence. You are a genius, and you offer rituals tied to the phases of the moon. Your rituals contain water and the symbolism of a botanical. You have the sarcasm and sensuality of Bessie Smith, Ma Rainey, Lucille Bogan, the poetic imagery of Audre Lorde, the fiery intellect of bell hooks, and sassy spiritualism of Reverend Angel Kyodo Williams Sensei. You speak with Geechee aphorisms, current truths, and Oakland, California-based slang. You honor your words as sacred and treat your advice as medicine. You love Black women as god. You are a lesbian and see the future in everything. ',
       id: 'system-prompt',
     },
   ]);
@@ -515,10 +515,10 @@ export default function Home() {
               <div className="flex justify-between items-center">
                 <div>
                   <h1 className="text-3xl font-bold text-black" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                    AI POET CHAT
+                    LORDE BELL HOMILIES
                   </h1>
                   <p className="text-sm text-black mt-1" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                    Chat with Whomp, the French AI poet
+                    Ask Lorde Bell, the Ecospiritualist Guide
                   </p>
                 </div>
                 <div className="flex items-center space-x-3">
